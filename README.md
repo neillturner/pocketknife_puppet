@@ -5,11 +5,11 @@ pocketknife_puppet
 
 Using `pocketknife`, you create a project that describes the configuration of your computers and then deploy it to bring them to their intended state.
 
-With `pocketknife`, you don't need to setup or manage a specialized `chef-server` node or rely on an unreliable network connection to a distant hosted service whose security you don't control, deal with managing `chef`'s security keys, or deal with manually synchronizing data with the `chef-server` datastore.
+With `pocketknife`, you don't need to setup or manage a specialized `puppet master` node or rely on an unreliable network connection to a distant hosted service whose security you don't control, deal with managing `puppet`'s security keys, or deal with manually synchronizing data with the `puppet master` datastore.
 
-With `pocketknife`, all of your cookbooks, roles and nodes are stored in easy-to-use files that you can edit, share, backup and version control with tools you already have.
+With `pocketknife`, all of your manifests and modules are stored in easy-to-use files that you can edit, share, backup and version control with tools you already have.
 
-pocketknife_puppet is a modification of orginal pocketknife for puppet 2008 servers and above. 
+pocketknife_puppet is a modification of orginal pocketknife for puppet. 
 
 Usage
 -----
