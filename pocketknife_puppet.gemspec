@@ -5,18 +5,18 @@
 
 Gem::Specification.new do |s|
   s.name = %q{pocketknife_puppet}
-  s.version = "0.1.0"
+  s.version = "0.1.10"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Igal Koshevoy","Neill Turner"]
-  s.date = %q{2011-05-17}
-  s.description = %q{pocketknife_puppet is a devops tool for managing computers running chef-solo, powered by Opscode Chef.
+  s.date = %q{2013-09-26}
+  s.description = %q{pocketknife_puppet is a devops tool for managing computers running masterless puppet.
 
 Using pocketknife, you create a project that describes the configuration of your computers and then deploy it to bring them to their intended state.
 
-With pocketknife, you don't need to setup or manage a specialized chef-server node or rely on an unreliable network connection to a distant hosted service whose security you don't control, deal with managing chef's security keys, or deal with manually synchronizing data with the chef-server datastore.
+With pocketknife, you don't need to setup or manage a specialized puppet master node or rely on an unreliable network connection to a distant hosted service whose security you don't control, deal with managing puppet's security keys, or deal with manually synchronizing data with the puppet-master datastore.
 
-With pocketknife, all of your cookbooks, roles and nodes are stored in easy-to-use files that you can edit, share, backup and version control with tools you already have.
+With pocketknife, all of your manifests and modules are stored in easy-to-use files that you can edit, share, backup and version control with tools you already have.
 
 This is modified to work with EC2Dream Fogviz but can also work stand alone. 
 }

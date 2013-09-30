@@ -24,7 +24,7 @@ class Pocketknife_puppet
     def initialize(name, pocketknife)
       self.name = name
       self.pocketknife = pocketknife
-      if pocketknife.user != nil and pocketknife.user != ""
+      if pocketknife.user != nil and pocketknife.user != "" and pocketknife.user != "root"
          @sudo = "sudo "
       end   
       self.connection_cache = nil
@@ -40,7 +40,15 @@ class Pocketknife_puppet
           if self.pocketknife.user != nil and self.pocketknife.user != ""
              user = self.pocketknife.user
           end
-          if self.pocketknife.ssh_key != nil and self.pocketknife.ssh_key != ""
+          if self.pocketknife.local_port != nil and self.pocketknife.local_port != ""
+             if self.pocketknife.ssh_key != nil and self.pocketknife.ssh_key != ""
+                puts "*** Connecting to ssh tunnel ..... via localhost port #{self.pocketknife.local_port} as user #{user} with ssh key *** "
+                rye = Rye::Box.new("localhost", {:user => user, :port => self.pocketknife.local_port, :keys => self.pocketknife.ssh_key, :safe => false })  
+             else
+                puts "*** Connecting to ssh tunnel ..... via localhost port #{self.pocketknife.local_port} as user #{user} *** "
+                 rye = Rye::Box.new("localhost", {:user => user, :port => self.pocketknife.local_port, :safe => false })
+             end
+          elsif self.pocketknife.ssh_key != nil and self.pocketknife.ssh_key != ""
              puts "*** Connecting to .... #{self.name} as user #{user} with ssh key *** "
              rye = Rye::Box.new(self.name, {:user => user, :keys => self.pocketknife.ssh_key, :safe => false })
           else
@@ -93,35 +101,56 @@ class Pocketknife_puppet
     # @return [Hash<String, Object] Return a hash describing the node, see above.
     # @raise [UnsupportedInstallationPlatform] Raised if there's no installation information for this platform.
     def platform
-      return self.platform_cache ||= begin
-         begin
-         result = {}
+       puts "*** platform cache #{self.platform_cache} "
+       result = {}
+       begin
          output = self.connection.cat("/etc/centos-release").to_s
          if output != nil and output != "" 
             result[:distributor]="centos"
             return result
          end
+       rescue 
+       end
+       begin
          output = self.connection.cat("/etc/redhat-release").to_s
          if output != nil and output != ""              
             result[:distributor]="red hat" 
             return result
-         end   
-         lsb_release = "/etc/lsb-release"
-          output = self.connection.cat(lsb_release).to_s 
+         end         
+       rescue 
+       end 
+       begin
+         # amazon linux is red hat
+         output = self.connection.cat("/etc/system-release").to_s
+         if output != nil and output != "" and output.include? "Amazon Linux" 
+            result[:distributor]="red hat" 
+            return result
+         end         
+       rescue 
+       end             
+       lsb_release = "/etc/lsb-release"
+       puts "*** lsb_release #{lsb_release}"
+       return self.platform_cache ||= begin
+        begin
+          output = self.connection.cat(lsb_release).to_s
+          result = {}
           result[:distributor] = output[/DISTRIB_ID\s*=\s*(.+?)$/, 1]
           result[:release] = output[/DISTRIB_RELEASE\s*=\s*(.+?)$/, 1]
           result[:codename] = output[/DISTRIB_CODENAME\s*=\s*(.+?)$/, 1]
           result[:version] = result[:release].to_f
+          puts "*** output #{output}"
+          puts "*** result #{result}"
           if result[:distributor] && result[:release] && result[:codename] && result[:version]
             return result
           else
-            raise UnsupportedInstallationPlatform.new("Can't install on node '#{self.name}' with invalid '#{lsb_release}' file", self.name)
+            raise UnsupportedInstallationPlatform.new("Can't install on node '#{self.name}' with invalid '/etc/lsb-release' file", self.name)
           end
         rescue Rye::Err
-          raise UnsupportedInstallationPlatform.new("Can't install on node '#{self.name}' without '#{lsb_release}'", self.name)
+          raise UnsupportedInstallationPlatform.new("Can't install on node '#{self.name}' without '/etc/lsb-release'", self.name)
         end
       end
     end
+
 
     # Installs Puppet and its dependencies on a node if needed.
     #
@@ -179,7 +208,7 @@ yum -y install puppet
      self.say("Installed puppet", false)
     end    
 
-    # Installs Rubygems on the remote node.
+    # Installs Rubygems on the remote node. this is obolete
  #  def install_rubygems
 #    if @sudo != nil and @sudo != ""
 #       install_rubygems_sudo
