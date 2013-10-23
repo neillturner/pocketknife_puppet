@@ -6,7 +6,6 @@
 Gem::Specification.new do |s|
   s.name = %q{pocketknife_puppet}
   s.version = "0.1.12"
-
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Igal Koshevoy","Neill Turner"]
   s.date = %q{2013-09-26}

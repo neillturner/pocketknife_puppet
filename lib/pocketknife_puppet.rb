@@ -181,7 +181,7 @@ OPTIONS:
   #
   # @return [String] A version string.
   def self.version
-    return "0.1.12"
+    return "0.1.11"
   end
 
   # Amount of detail to display? true means verbose, nil means normal, false means quiet.
