@@ -369,6 +369,7 @@ yum -y install puppet
       rescue
          error_run = true 
       end 
+	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if error_run == false
          self.say("*** showing last 100 lines from /var/log/puppet/apply.log *** ")
          self.execute("#{@sudo} tail -n 100 /var/log/puppet/apply.log", true)
          if error_run 
