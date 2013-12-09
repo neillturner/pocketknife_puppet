@@ -349,8 +349,13 @@ yum -y install puppet
     def apply
       self.install
       if self.pocketknife.facts != nil and self.pocketknife.facts != ""
-        facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
-        facts_cmd = facts_array.join("; ") 
+	    if @sudo != nil and @sudo !=""
+           facts_array = self.pocketknife.facts.split(',').map { |f| f = "FACTER_#{f}"  } 
+           facts_cmd = facts_array.join(" ")		
+		else
+           facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
+           facts_cmd = facts_array.join("; ")
+		end   
       else 
         fact_cmd = ""
       end  
@@ -358,14 +363,20 @@ yum -y install puppet
       self.say("****************************** ", true)
       self.say("*** Applying configuration *** ", true)
       self.say("****************************** ", true)
-      command = "#{@sudo}puppet apply #{@noop} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
+      command = "puppet apply #{@noop} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
       command << " -v -d " if self.pocketknife.verbosity == true
       error_run = false 
       begin 
-	  self.execute(<<-HERE, true)
- #{@sudo}#{facts_cmd} &&
- #{@sudo}#{command} 
-	 HERE
+	   if @sudo != nil and @sudo !=""
+		  self.execute(<<-HERE, true)
+  #{@sudo} #{facts_cmd} #{command} 
+       HERE
+       else
+	     self.execute(<<-HERE, true)
+ #{facts_cmd} &&
+ #{command} 
+       HERE
+	   end
       rescue
          error_run = true 
       end 

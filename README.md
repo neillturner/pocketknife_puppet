@@ -20,6 +20,14 @@ Install the software on the machine you'll be running `pocketknife` on, this is 
 * Install Rubygems: http://rubygems.org/
 * Install `pocketknife_puppet`: `gem install pocketknife_puppet`
 
+* Update the Repositories to use Puppet version 3 
+  For ubuntu version 12 
+     wget http://apt.puppetlabs.com/puppetlabs-release-precise.deb
+     sudo dpkg -i puppetlabs-release-precise.deb
+  For 64 bit Centos or Redhat
+    rpm -ivh http://yum.puppetlabs.com/el/6/products/x86_64/puppetlabs-release-6-7.noarch.rpm
+
+
 Create a new *project*, a special directory that will contain your configuration files. For example, create the `swa` project directory by running:
 
     pocketknife_puppet --create swa
