@@ -16,8 +16,11 @@ class Pocketknife_puppet
     attr_accessor :platform_cache
     
     @sudo = ""
-	@noop = ""
+	@sudo_facts = ""
+	@nodeleterepo = false
+	@noupdatepackages = false
 	@hiera = ""
+	@xoptions = ""
 
     # Initialize a new node.
     #
@@ -27,11 +30,34 @@ class Pocketknife_puppet
       self.name = name
       self.pocketknife = pocketknife
       if pocketknife.user != nil and pocketknife.user != "" and pocketknife.user != "root"
-         @sudo = "sudo "
+	     if pocketknife.sudo_password != nil and pocketknife.sudo_password != ""
+		    case self.platform[:distributor].downcase
+              when /ubuntu/, /debian/, /gnu\/linux/
+		        @sudo = "echo #{pocketknife.sudo_password} | sudo -S "
+			  else
+			    @sudo = "echo #{pocketknife.sudo_password} | sudo -S "
+				@sudo_facts = "echo #{pocketknife.sudo_password} | sudo -S "
+			end  
+		 else
+           @sudo = "sudo "
+	        case self.platform[:distributor].downcase
+              when /ubuntu/, /debian/, /gnu\/linux/
+		        @sudo_facts = ""
+			  else
+			    @sudo_facts = "sudo "
+			end 	   
+		   
+		 end
       end
-	  if pocketknife.noop != nil and pocketknife.noop == true	  
-         @noop = "--noop"
+	  if pocketknife.nodeleterepo != nil and pocketknife.nodeleterepo == true	  
+         @nodeleterepo =true
       end
+	  if pocketknife.noupdatepackages != nil and pocketknife.noupdatepackages == true	  
+         @noupdatepackages =true
+      end	  
+	  if pocketknife.xoptions != nil and pocketknife.xoptions != ""	  
+         @xoptions = pocketknife.xoptions
+      end	  
       if pocketknife.hiera_config != nil and pocketknife.hiera_config != ""	  
          @hiera = "--hiera_config  #{VAR_POCKETKNIFE}/#{pocketknife.hiera_config}"
       end 	  
@@ -167,54 +193,44 @@ class Pocketknife_puppet
     # @raise [UnsupportedInstallationPlatform] Raised if there's no installation information for this platform.
     def install
       unless self.has_executable?("puppet")
-        #case self.pocketknife.can_install
-        #when nil
-          # Prompt for installation
-        #  print "? #{self.name}: Puppet not found. Install it and its dependencies? (Y/n) "
-        #  STDOUT.flush
-        #  answer = STDIN.gets.chomp
-        #  case answer
-       #   when /^y/i, ''
-            # Continue with install
-       #   else
-       #     raise NotInstalling.new("Puppet isn't installed on node '#{self.name}', but user doesn't want to install it.", self.name)
-       #   end
-       # when true
-          # User wanted us to install
-      #  else
-          # Don't install
-      #    raise NotInstalling.new("Puppet isn't installed on node '#{self.name}', but user doesn't want to install it.", self.name)
-      #  end
-#
-     #   unless self.has_executable?("ruby")
-     #     self.install_ruby
-     #   end
-#
-     #   unless self.has_executable?("gem")
-     #     self.install_rubygems
-     #   end
-
-        self.install_puppet
+         self.install_puppet
       end
     end
+
+
+    def install_packages
+      self.say("*** Update Packages ***")	
+      case self.platform[:distributor].downcase
+           when /ubuntu/, /debian/, /gnu\/linux/
+            self.execute <<-HERE
+    #{@sudo} apt-get -y update &&
+    #{@sudo} apt-get -y upgrade &&	
+    HERE	
+      else
+           self.execute <<-HERE
+    yum -y update &&
+    HERE	
+      end 	  
+    end		
+
 
     # Installs Puppet on the remote node.
     def install_puppet
       self.say("*** Installing puppet ***")
+	  if @noupdatepackages == nil or @noupdatepackages != true
+	    self.install_packages
+	  end	
       case self.platform[:distributor].downcase
         when /ubuntu/, /debian/, /gnu\/linux/
-          self.execute(<<-HERE, true)
-#{@sudo} apt-get -y update &&
-#{@sudo} apt-get -y upgrade &&
-#{@sudo} apt-get -y install puppet 
-   HERE
+        self.execute(<<-HERE, true)
+  #{@sudo} apt-get -y install puppet 
+  HERE
       else
          self.execute(<<-HERE, true)
-yum -y update &&
-yum -y install puppet       
-      HERE
-     end  
-     self.say("Installed puppet", false)
+  yum -y install puppet       
+  HERE
+      end
+      self.say("Installed puppet", false)
     end    
 
     # Prepares an upload, by creating a cache of shared files used by all nodes.
@@ -283,15 +299,13 @@ yum -y install puppet
        upload_sudo
      else   
        self.say("*** Uploading configuration ***")
- 
-       self.say("*** Removing old files *** ", false)
+        self.say("*** Removing old files *** ", false)
        self.execute <<-HERE
 	rm -f /var/log/puppet/apply.log &&   
     umask 0377 &&
    rm -rf "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}" &&
    mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}"  
    HERE
- 
        self.say("Uploading new files...", false)
        self.connection.file_upload(TMP_TARBALL.to_s, VAR_POCKETKNIFE_TARBALL.to_s)
        self.say("Installing new files...", false)
@@ -302,8 +316,7 @@ yum -y install puppet
    chown -R root:root . &&
    mv * "#{VAR_POCKETKNIFE}"
        HERE
- 
-       self.say("*** Finished uploading! *** ", false)
+        self.say("*** Finished uploading! *** ", false)
     end
  end   
 
@@ -349,6 +362,15 @@ yum -y install puppet
     def apply
       self.install
       if self.pocketknife.facts != nil and self.pocketknife.facts != ""
+<<<<<<< HEAD
+        facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
+        facts_cmd = facts_array.join("; ")
+        case self.platform[:distributor].downcase
+           when /ubuntu/, /debian/, /gnu\/linux/
+            facts_env_array = self.pocketknife.facts.split(',').map { |f| f = "FACTER_#{f}"  }
+		    facts_env = facts_env_array.join(" ")
+        end 	  		
+=======
 	    if @sudo != nil and @sudo !=""
            facts_array = self.pocketknife.facts.split(',').map { |f| f = "FACTER_#{f}"  } 
            facts_cmd = facts_array.join(" ")		
@@ -356,13 +378,26 @@ yum -y install puppet
            facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
            facts_cmd = facts_array.join("; ")
 		end   
+>>>>>>> bada297f58dde40e23237c20be0c2e84da69f44a
       else 
-        fact_cmd = ""
+        facts_cmd = "true"
       end  
       
       self.say("****************************** ", true)
       self.say("*** Applying configuration *** ", true)
       self.say("****************************** ", true)
+<<<<<<< HEAD
+	  self.say("***sudo is #{@sudo} ", true)
+      command = "puppet apply #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
+      command << " -v -d " if self.pocketknife.verbosity == true
+      error_run = false 
+      begin 
+ 
+	  self.execute(<<-HERE, true)
+ #{@sudo_facts}#{facts_cmd} &&	  	  
+ #{@sudo} #{facts_env} #{command}
+	 HERE
+=======
       command = "puppet apply #{@noop} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
       command << " -v -d " if self.pocketknife.verbosity == true
       error_run = false 
@@ -377,10 +412,11 @@ yum -y install puppet
  #{command} 
        HERE
 	   end
+>>>>>>> bada297f58dde40e23237c20be0c2e84da69f44a
       rescue
          error_run = true 
       end 
-	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if error_run == false
+	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if error_run == false and @nodeleterepo != true
          self.say("*** showing last 100 lines from /var/log/puppet/apply.log *** ")
          self.execute("#{@sudo} tail -n 100 /var/log/puppet/apply.log", true)
          if error_run 

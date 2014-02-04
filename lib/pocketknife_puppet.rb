@@ -85,6 +85,11 @@ OPTIONS:
         pocketknife_puppet.user = name
       end
 	  
+	  parser.on("-t", "--sudopassword PASSWORD", "password of sudo user") do |name|
+        options[:sudo_password] = true
+        pocketknife_puppet.sudo_password = name
+      end
+	  
 	  parser.on("-p", "--password PASSWORD", "password of user if not using ssh keys") do |name|
         options[:password] = true
         pocketknife_puppet.password = name
@@ -95,10 +100,15 @@ OPTIONS:
         pocketknife_puppet.ssh_key = name
       end
 
-	  parser.on("-n", "--noop", "check for compilation errors and view a log of events") do |v|
-        options[:noop] = true
-		pocketknife_puppet.noop = true
+	  parser.on("-n", "--nodeleterepo", "don't delete the puppet repository after the run") do |v|
+        options[:nodeleterepo] = true
+		pocketknife_puppet.nodeleterepo = true
       end
+	  
+	  parser.on("-z", "--noupdatepackages", "don't update the packages before running puppet") do |v|
+        options[:noupdatepackages] = true
+		pocketknife_puppet.noupdatepackages = true
+      end	  
 	  
       parser.on("-u", "--upload", "Upload configuration, but don't apply it") do |v|
         options[:upload] = true
@@ -119,6 +129,11 @@ OPTIONS:
       parser.on("-m", "--manifest MANIFEST", "Puppet manifest defaults to init.pp") do |name|
         options[:manifest] = name
         pocketknife_puppet.manifest = name
+      end
+	  
+	  parser.on("-x", "--xoptions OPTIONS", "Extra options for puppet apply like --noop") do |name|
+        options[:xoptions] = name
+        pocketknife_puppet.xoptions = name
       end
       
 	  parser.on("-e", "--hiera_config MANIFEST", "hiera config file in hieradata directory") do |name|
@@ -205,8 +220,17 @@ OPTIONS:
   # password of user if not using ssh keys
   attr_accessor :password
   
-  # user when doing sudo access
-  attr_accessor :noop
+  # password of sudo user
+  attr_accessor :sudo_password
+  
+  # xtra options for the puppet apply commands 
+  attr_accessor :xoptions
+
+  # don't delete puppet repo after running puppet
+  attr_accessor :nodeleterepo
+  
+   # don't update packages before running puppet
+  attr_accessor :noupdatepackages 
   
   # user when doing sudo access
   attr_accessor :hiera_config
