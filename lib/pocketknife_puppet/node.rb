@@ -17,10 +17,12 @@ class Pocketknife_puppet
     
     @sudo = ""
 	@sudo_facts = ""
-	@nodeleterepo = false
+	@deleterepo = false
 	@noupdatepackages = false
 	@hiera = ""
 	@xoptions = ""
+	#@modules_list = ""
+	@modules_path = ""
 
     # Initialize a new node.
     #
@@ -49,8 +51,8 @@ class Pocketknife_puppet
 		   
 		 end
       end
-	  if pocketknife.nodeleterepo != nil and pocketknife.nodeleterepo == true	  
-         @nodeleterepo =true
+	  if pocketknife.deleterepo != nil and pocketknife.deleterepo == true	  
+         @deleterepo =true
       end
 	  if pocketknife.noupdatepackages != nil and pocketknife.noupdatepackages == true	  
          @noupdatepackages =true
@@ -60,8 +62,18 @@ class Pocketknife_puppet
       end	  
       if pocketknife.hiera_config != nil and pocketknife.hiera_config != ""	  
          @hiera = "--hiera_config  #{VAR_POCKETKNIFE}/#{pocketknife.hiera_config}"
-      end 	  
-      self.connection_cache = nil
+      end 
+	  if pocketknife.module_path != nil and pocketknife.module_path != ""
+ 		 mod_array = pocketknife.module_path.split(':')
+		 mod_array.each_index do |i|
+		   mod_array[i] = VAR_POCKETKNIFE + mod_array[i]
+		 end 
+		 @modules_path = ":"+mod_array.join(":") 
+		 puts "*** module path #{@modules_path}"
+	  else 
+         @modules_list = VAR_POCKETKNIFE_MODULES.basename.to_s 	  
+      end
+	  self.connection_cache = nil
     end
 
     # Returns a Rye::Box connection.
@@ -195,26 +207,12 @@ class Pocketknife_puppet
       unless self.has_executable?("puppet")
          self.install_puppet
       end
+      unless self.has_executable?("librarian-puppet")
+         self.install_puppet_librarian
+      end	  
     end
-
-
-    def install_packages
-      self.say("*** Update Packages ***")	
-      case self.platform[:distributor].downcase
-           when /ubuntu/, /debian/, /gnu\/linux/
-            self.execute <<-HERE
-    #{@sudo} apt-get -y update &&
-    #{@sudo} apt-get -y upgrade &&	
-    HERE	
-      else
-           self.execute <<-HERE
-    yum -y update &&
-    HERE	
-      end 	  
-    end		
-
-
-    # Installs Puppet on the remote node.
+	
+   # Installs Puppet on the remote node.
     def install_puppet
       self.say("*** Installing puppet ***")
 	  if @noupdatepackages == nil or @noupdatepackages != true
@@ -222,18 +220,52 @@ class Pocketknife_puppet
 	  end	
       case self.platform[:distributor].downcase
         when /ubuntu/, /debian/, /gnu\/linux/
-        self.execute(<<-HERE, true)
-  #{@sudo} apt-get -y install puppet 
-  HERE
+        self.execute <<-HERE
+    #{@sudo} apt-get -y install puppet
+    HERE
       else
-         self.execute(<<-HERE, true)
-  yum -y install puppet       
-  HERE
+         self.execute <<-HERE
+    yum -y install puppet 
+    HERE
       end
       self.say("Installed puppet", false)
-    end    
+    end  
+	
+  # Installs Puppet librarian on the remote node.
+    def install_puppet_librarian
+      self.say("*** Installing puppet librarian ***")
+      case self.platform[:distributor].downcase
+        when /ubuntu/, /debian/, /gnu\/linux/
+        self.execute <<-HERE
+    #{@sudo} apt-get -y install git ruby-dev make &&
+    #{@sudo} gem install librarian-puppet
+    HERE
+      else
+         self.execute <<-HERE
+    yum -y install git &&
+    gem install librarian-puppet  
+    HERE
+      end
+      self.say("Installed puppet librarian", false)
+    end	
+	
+    def install_packages
+      self.say("*** Installing packages ***")
+      case self.platform[:distributor].downcase
+        when /ubuntu/, /debian/, /gnu\/linux/
+        self.execute <<-HERE
+    #{@sudo} apt-get -y update &&
+    #{@sudo} apt-get -y upgrade
+    HERE
+      else
+         self.execute <<-HERE
+    yum -y update
+     HERE
+      end
+      self.say("Updated Packages", false)
+    end  	
 
-    # Prepares an upload, by creating a cache of shared files used by all nodes.
+     # Prepares an upload, by creating a cache of shared files used by all nodes.
     #
     # IMPORTANT: This will create files and leave them behind. You should use the block syntax or manually call {cleanup_upload} when done.
     #
@@ -244,7 +276,7 @@ class Pocketknife_puppet
     #   end
     #
     # @yield [] Prepares the upload, executes the block, and cleans up the upload when done.
-    def self.prepare_upload(&block)
+    def self.prepare_upload(module_list=VAR_POCKETKNIFE_MODULES.basename.to_s, &block)
       begin
         puts("********************** ")
         puts("*** Prepare upload *** ")
@@ -253,17 +285,20 @@ class Pocketknife_puppet
         # minitar gem on windows tar file corrupt so use alternative command
         if RUBY_PLATFORM.index("mswin") != nil or RUBY_PLATFORM.index("i386-mingw32") != nil
            puts "*** On windows using tar.exe *** "
-           puts "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf #{TMP_TARBALL.to_s} #{VAR_POCKETKNIFE_MANIFESTS.basename.to_s} #{VAR_POCKETKNIFE_MODULES.basename.to_s} #{VAR_POCKETKNIFE_HIERA.basename.to_s} hiera.yaml" 
-           system "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf #{TMP_TARBALL.to_s} #{VAR_POCKETKNIFE_MANIFESTS.basename.to_s} #{VAR_POCKETKNIFE_MODULES.basename.to_s} #{VAR_POCKETKNIFE_HIERA.basename.to_s} hiera.yaml" 
+           puts "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf *.*" 
+           system "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf #{TMP_TARBALL.to_s} *.*" 		   
+           #puts "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf #{TMP_TARBALL.to_s} #{VAR_POCKETKNIFE_MANIFESTS.basename.to_s} #{module_list} #{VAR_POCKETKNIFE_HIERA.basename.to_s} hiera.yaml Puppetfile" 
+           #system "#{ENV['POCKETKNIFE_PUPPET_HOME']}/tar/tar.exe cvf #{TMP_TARBALL.to_s} #{VAR_POCKETKNIFE_MANIFESTS.basename.to_s} #{module_list} #{VAR_POCKETKNIFE_HIERA.basename.to_s} hiera.yaml Puppetfile" 
         else
+		   # TODO: change to get all the files like for windows.....
            TMP_TARBALL.open("w") do |handle|
              Archive::Tar::Minitar.pack(
               [
                VAR_POCKETKNIFE_MANIFESTS.basename.to_s,
-               VAR_POCKETKNIFE_MODULES.basename.to_s,
-			   VAR_POCKETKNIFE_HIERA.basename.to_s,
+  			   VAR_POCKETKNIFE_HIERA.basename.to_s,
+			   'Puppetfile',
 			   'hiera.yaml'
-			   ],
+			   ]+module_list.split(' '),
               handle
              )
            end  
@@ -303,8 +338,10 @@ class Pocketknife_puppet
        self.execute <<-HERE
 	rm -f /var/log/puppet/apply.log &&   
     umask 0377 &&
-   rm -rf "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}" &&
-   mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}"  
+	export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock &&
+   rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} &&
+   export GLOBIGNORE= &&
+   mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}"  
    HERE
        self.say("Uploading new files...", false)
        self.connection.file_upload(TMP_TARBALL.to_s, VAR_POCKETKNIFE_TARBALL.to_s)
@@ -330,8 +367,10 @@ class Pocketknife_puppet
       self.say("*** Removing old files ***", false)
       self.execute <<-HERE
    umask 0377 &&
-  #{@sudo}rm -rf "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}" &&
-  #{@sudo}mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE_CACHE}" &&
+  export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock &&
+  #{@sudo}rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} && 
+  export GLOBIGNORE= &&
+  #{@sudo}mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}" &&
   #{@sudo}chmod -R a+rwX "#{ETC_PUPPET}" &&
   #{@sudo}chmod -R a+rwX "#{VAR_POCKETKNIFE}" &&
   #{@sudo}chmod -R a+rwX "#{VAR_POCKETKNIFE_CACHE}"
@@ -362,7 +401,6 @@ class Pocketknife_puppet
     def apply
       self.install
       if self.pocketknife.facts != nil and self.pocketknife.facts != ""
-<<<<<<< HEAD
         facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
         facts_cmd = facts_array.join("; ")
         case self.platform[:distributor].downcase
@@ -370,25 +408,40 @@ class Pocketknife_puppet
             facts_env_array = self.pocketknife.facts.split(',').map { |f| f = "FACTER_#{f}"  }
 		    facts_env = facts_env_array.join(" ")
         end 	  		
-=======
-	    if @sudo != nil and @sudo !=""
-           facts_array = self.pocketknife.facts.split(',').map { |f| f = "FACTER_#{f}"  } 
-           facts_cmd = facts_array.join(" ")		
-		else
-           facts_array = self.pocketknife.facts.split(',').map { |f| f = "export FACTER_#{f}"  } 
-           facts_cmd = facts_array.join("; ")
-		end   
->>>>>>> bada297f58dde40e23237c20be0c2e84da69f44a
       else 
         facts_cmd = "true"
       end  
-      
+	  
+	  if self.connection.file_exists?("#{VAR_POCKETKNIFE}/Puppetfile.lock")
+       self.say("******************************************************************* ", true)
+       self.say("*** librarian-puppet not run as Puppetfile.lock already in repo *** ", true)
+	   self.say("*** specify -n on pocketknife_puppet command force update of modules  *** ", true)
+       self.say("******************************************************************* ", true)	  
+      elsif self.connection.file_exists?("#{VAR_POCKETKNIFE}/Puppetfile")
+       self.say("************************************************************* ", true)
+       self.say("*** Run librarian-puppet install using Puppetfile in repo *** ", true)
+       self.say("************************************************************* ", true)	  
+	   begin 
+	     self.execute(<<-HERE, true)
+       cd #{VAR_POCKETKNIFE} &&
+       #{@sudo} librarian-puppet install --path=modules --verbose
+       HERE
+        rescue
+         error_run = true 
+        end 
+      else 
+	   self.say("*** No #{VAR_POCKETKNIFE}/Puppetfile in Puppet Repository *** ", true)
+      end
+	  
       self.say("****************************** ", true)
       self.say("*** Applying configuration *** ", true)
       self.say("****************************** ", true)
-<<<<<<< HEAD
-	  self.say("***sudo is #{@sudo} ", true)
-      command = "puppet apply #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
+	  self.say("***sudo is #{@sudo} ", true)	  
+	  module_path = #{VAR_POCKETKNIFE_MODULES}
+	  if pocketknife.module_path != nil and pocketknife.module_path != ""	  
+         @modules_list = pocketknife.module_path.gsub(/:/,' ')
+      end
+      command = "puppet apply #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=\"#{VAR_POCKETKNIFE_MODULES}#{@modules_path}\" #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
       command << " -v -d " if self.pocketknife.verbosity == true
       error_run = false 
       begin 
@@ -397,26 +450,10 @@ class Pocketknife_puppet
  #{@sudo_facts}#{facts_cmd} &&	  	  
  #{@sudo} #{facts_env} #{command}
 	 HERE
-=======
-      command = "puppet apply #{@noop} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=#{VAR_POCKETKNIFE_MODULES} #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
-      command << " -v -d " if self.pocketknife.verbosity == true
-      error_run = false 
-      begin 
-	   if @sudo != nil and @sudo !=""
-		  self.execute(<<-HERE, true)
-  #{@sudo} #{facts_cmd} #{command} 
-       HERE
-       else
-	     self.execute(<<-HERE, true)
- #{facts_cmd} &&
- #{command} 
-       HERE
-	   end
->>>>>>> bada297f58dde40e23237c20be0c2e84da69f44a
       rescue
          error_run = true 
       end 
-	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if error_run == false and @nodeleterepo != true
+	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
          self.say("*** showing last 100 lines from /var/log/puppet/apply.log *** ")
          self.execute("#{@sudo} tail -n 100 /var/log/puppet/apply.log", true)
          if error_run 

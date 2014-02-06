@@ -5,7 +5,7 @@ class Pocketknife_puppet
   module Version
     MAJOR = 0
     MINOR = 1
-    PATCH = 14
+    PATCH = 10
     BUILD = nil
 
     STRING = [MAJOR, MINOR, PATCH, BUILD].compact.join('.')

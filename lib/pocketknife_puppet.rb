@@ -61,21 +61,70 @@ OPTIONS:
       HERE
 
       options = {}
+	  
+	  parser.on("-a", "--apply", "Runs puppet to apply already-uploaded configuration") do |v|
+        options[:apply] = true
+      end
 
       parser.on("-c", "--create PROJECT", "Create project") do |name|
         pocketknife_puppet.create(name)
         return
       end
-
-      parser.on("-V", "--version", "Display version number") do |name|
-        puts "Pocketknife_puppet #{Pocketknife_puppet::Version::STRING}"
-        return
+	  
+      parser.on("-d", "--module_path PATH", "Puppet module path with colon as separator. Defaults to all directories staring modules") do |name|
+        options[:module_path] = name
+        pocketknife_puppet.module_path = name
+      end
+	  
+	  parser.on("-e", "--hiera_config CONFIG_FILE", "hiera config file in hieradata directory") do |name|
+        options[:hiera_config] = name
+        pocketknife_puppet.hiera_config = name
+      end
+	  
+      #parser.on("-j", "--chefversion CHEF_VERSION", "install a paticular chef version") do |name|
+      #        options[:chef_version] = name
+      #        pocketknife.chef_version = name
+      #end
+      parser.on("-f", "--facts fact1=aaa,fact2=bbb", "set the puppet facts before running puppet apply") do |name|
+              options[:facts] = name
+              pocketknife_puppet.facts = name
+      end  
+	  
+      parser.on("-i", "--install", "Install Puppet automatically") do |v|
+        pocketknife_puppet.can_install = true
       end
 
-      parser.on("-v", "--verbose", "Display detailed status information") do |name|
-        pocketknife_puppet.verbosity = true
+      parser.on("-I", "--noinstall", "Don't install Puppet automatically") do |v|
+        pocketknife_puppet.can_install = false
+      end
+      
+    
+      parser.on("-k", "--sshkey SSHKEY", "Use an ssh key") do |name|
+        options[:ssh_key] = name
+        pocketknife_puppet.ssh_key = name
+      end	  
+      
+      parser.on("-l", "--localport LOCAL_PORT", "use a local port to access an ssh tunnel") do |name|
+              options[:local_port] = name
+              pocketknife_puppet.local_port = name
+      end            	  
+	
+      parser.on("-m", "--manifest MANIFEST", "Puppet manifest defaults to init.pp and assumed to be in the manifests directory.") do |name|
+        options[:manifest] = name
+        pocketknife_puppet.manifest = name
       end
 
+	  parser.on("-n", "--deleterepo", "Delete the puppet repository after the run") do |v|
+        options[:deleterepo] = true
+		pocketknife_puppet.deleterepo = true
+      end
+	  
+	  
+	  parser.on("-p", "--password PASSWORD", "password of user if not using ssh keys") do |name|
+        options[:password] = true
+        pocketknife_puppet.password = name
+      end
+  
       parser.on("-q", "--quiet", "Display minimal status information") do |v|
         pocketknife_puppet.verbosity = false
       end
@@ -89,72 +138,32 @@ OPTIONS:
         options[:sudo_password] = true
         pocketknife_puppet.sudo_password = name
       end
-	  
-	  parser.on("-p", "--password PASSWORD", "password of user if not using ssh keys") do |name|
-        options[:password] = true
-        pocketknife_puppet.password = name
-      end
-      
-      parser.on("-k", "--sshkey SSHKEY", "Use an ssh key") do |name|
-        options[:ssh_key] = name
-        pocketknife_puppet.ssh_key = name
+
+	
+
+      parser.on("-u", "--upload", "Upload configuration, but don't apply it") do |v|
+        options[:upload] = true
       end
 
-	  parser.on("-n", "--nodeleterepo", "don't delete the puppet repository after the run") do |v|
-        options[:nodeleterepo] = true
-		pocketknife_puppet.nodeleterepo = true
+      parser.on("-V", "--version", "Display version number") do |name|
+        puts "Pocketknife_puppet #{Pocketknife_puppet::Version::STRING}"
+        return
+      end
+
+      parser.on("-v", "--verbose", "Display detailed status information") do |name|
+        pocketknife_puppet.verbosity = true
+      end	
+  
+	  parser.on("-x", "--xoptions OPTIONS", "Extra options for puppet apply like --noop") do |name|
+        options[:xoptions] = name
+        pocketknife_puppet.xoptions = name
       end
 	  
 	  parser.on("-z", "--noupdatepackages", "don't update the packages before running puppet") do |v|
         options[:noupdatepackages] = true
 		pocketknife_puppet.noupdatepackages = true
-      end	  
-	  
-      parser.on("-u", "--upload", "Upload configuration, but don't apply it") do |v|
-        options[:upload] = true
-      end
-
-      parser.on("-a", "--apply", "Runs puppet to apply already-uploaded configuration") do |v|
-        options[:apply] = true
-      end
-
-      parser.on("-i", "--install", "Install Puppet automatically") do |v|
-        pocketknife_puppet.can_install = true
-      end
-
-      parser.on("-I", "--noinstall", "Don't install Puppet automatically") do |v|
-        pocketknife_puppet.can_install = false
-      end
-      
-      parser.on("-m", "--manifest MANIFEST", "Puppet manifest defaults to init.pp") do |name|
-        options[:manifest] = name
-        pocketknife_puppet.manifest = name
-      end
-	  
-	  parser.on("-x", "--xoptions OPTIONS", "Extra options for puppet apply like --noop") do |name|
-        options[:xoptions] = name
-        pocketknife_puppet.xoptions = name
-      end
-      
-	  parser.on("-e", "--hiera_config MANIFEST", "hiera config file in hieradata directory") do |name|
-        options[:hiera_config] = name
-        pocketknife_puppet.hiera_config = name
-      end
-	  
-      #parser.on("-j", "--chefversion CHEF_VERSION", "install a paticular chef version") do |name|
-      #        options[:chef_version] = name
-      #        pocketknife.chef_version = name
-      #end
-      parser.on("-f", "--facts fact1=aaa,fact2=bbb", "set the puppet facts before running puppet apply") do |name|
-              options[:facts] = name
-              pocketknife_puppet.facts = name
-      end  
-      
-      parser.on("-l", "--localport LOCAL_PORT", "use a local port to access an ssh tunnel") do |name|
-              options[:local_port] = name
-              pocketknife_puppet.local_port = name
-      end            
-
+      end	 
+  
       begin
         arguments = parser.parse!
       rescue OptionParser::MissingArgument => e
@@ -227,7 +236,7 @@ OPTIONS:
   attr_accessor :xoptions
 
   # don't delete puppet repo after running puppet
-  attr_accessor :nodeleterepo
+  attr_accessor :deleterepo
   
    # don't update packages before running puppet
   attr_accessor :noupdatepackages 
@@ -237,7 +246,10 @@ OPTIONS:
       
   # puppet manifest name
   attr_accessor :manifest
-
+  
+  # puppet module path
+  attr_accessor :module_path  
+  
   # Can chef and its dependencies be installed automatically if not found? true means perform installation without prompting, false means quit if chef isn't available, and nil means prompt the user for input.
   attr_accessor :can_install
 
@@ -311,8 +323,9 @@ OPTIONS:
   # @params[Array<String>] nodes A list of node names.
   def deploy(nodes)
     node_manager.assert_known(nodes)
-
-    Node.prepare_upload do
+	module_list = nil 
+    module_list =  self.module_path.gsub(/:/,' ') if self.module_path != nil
+    Node.prepare_upload(module_list) do
       for node in nodes
         node_manager.find(node).deploy
       end
@@ -324,8 +337,9 @@ OPTIONS:
   # @param [Array<String>] nodes A list of node names.
   def upload(nodes)
     node_manager.assert_known(nodes)
-
-    Node.prepare_upload do
+	module_list = nil 
+    module_list =  pocketknife_puppet.module_path.gsub(/:/,' ') if pocketknife_puppet.module_path != nil
+    Node.prepare_upload(module_list) do
       for node in nodes
         node_manager.find(node).upload
       end

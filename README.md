@@ -14,6 +14,31 @@ pocketknife_puppet is a modification of orginal pocketknife for puppet.
 Usage
 -----
 
+This version supports libarian-puppet. It assumes that the modules directory is used by librarian-puppet so the 
+modules must be in another directory say modules-mycompany which is passed in the -d option.. 
+
+OPTIONS:
+    -a, --apply                      Runs puppet to apply already-uploaded configuration
+    -c, --create PROJECT             Create project
+    -d, --module_path PATH           Puppet module path with colon as separator. Defaults to all directories staring modules
+    -e, --hiera_config CONFIG_FILE   hiera config file in hieradata directory
+    -f, --facts fact1=aaa,fact2=bbb  set the puppet facts before running puppet apply
+    -i, --install                    Install Puppet automatically
+    -I, --noinstall                  Don't install Puppet automatically
+    -k, --sshkey SSHKEY              Use an ssh key
+    -l, --localport LOCAL_PORT       use a local port to access an ssh tunnel
+    -m, --manifest MANIFEST          Puppet manifest defaults to init.pp and assumed to be in the manifests directory.
+    -n, --deleterepo                 Delete the puppet repository after the run
+    -p, --password PASSWORD          password of user if not using ssh keys
+    -q, --quiet                      Display minimal status information
+    -s, --sudo USER                  Run under non-root users with sudo
+    -t, --sudopassword PASSWORD      password of sudo user
+    -u, --upload                     Upload configuration, but don't apply it
+    -V, --version                    Display version number
+    -v, --verbose                    Display detailed status information
+    -x, --xoptions OPTIONS           Extra options for puppet apply like --noop
+    -z, --noupdatepackages           don't update the packages before running puppet
+
 Install the software on the machine you'll be running `pocketknife` on, this is a computer that will deploy configurations to other computers:
 
 * Install Ruby: http://www.ruby-lang.org/
@@ -79,4 +104,4 @@ Copyright
 ---------
 
 Copyright (c) 2011 Igal Koshevoy. See `LICENSE.txt` for further details.
-Modifications by Neill Turner (2013). 
+Modifications by Neill Turner (2014). 
