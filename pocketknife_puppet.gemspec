@@ -48,7 +48,8 @@ This is modified to work with EC2Dream Fogviz but can also work stand alone.
     "spec/pocketknife_spec.rb",
     "spec/spec_helper.rb",
     "spec/support/libraries.rb",
-    "spec/support/mkproject.rb"
+    "spec/support/mkproject.rb",
+	"puppet_repo.zip"
   ]
   s.homepage = %q{http://github.com/neillturner/pocketknife_puppet}
   s.licenses = ["MIT"]

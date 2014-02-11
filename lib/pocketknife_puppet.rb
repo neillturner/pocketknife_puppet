@@ -71,7 +71,7 @@ OPTIONS:
         return
       end
 	  
-      parser.on("-d", "--module_path PATH", "Puppet module path with colon as separator. Defaults to all directories staring modules") do |name|
+      parser.on("-d", "--module_path PATH", "Puppet module path with colon as separator. Defaults to all directories in modules directory") do |name|
         options[:module_path] = name
         pocketknife_puppet.module_path = name
       end
@@ -119,6 +119,11 @@ OPTIONS:
 		pocketknife_puppet.deleterepo = true
       end
 	  
+	  parser.on("-o", "--noop", "Runs puppet apply with noop option no no changes are made") do |v|
+        options[:apply] = true
+		options[:noop] = true
+		pocketknife_puppet.noop = true
+      end
 	  
 	  parser.on("-p", "--password PASSWORD", "password of user if not using ssh keys") do |name|
         options[:password] = true
@@ -127,6 +132,11 @@ OPTIONS:
   
       parser.on("-q", "--quiet", "Display minimal status information") do |v|
         pocketknife_puppet.verbosity = false
+      end
+	  
+	  parser.on("-r", "--rspec PATH", "RSpec testing of puppet scripts in the module path specified") do |name|
+  	    options[:rspec] = true
+        pocketknife_puppet.rspec = name
       end
       
       parser.on("-s", "--sudo USER", "Run under non-root users with sudo") do |name|
@@ -138,8 +148,6 @@ OPTIONS:
         options[:sudo_password] = true
         pocketknife_puppet.sudo_password = name
       end
-
-	
 
       parser.on("-u", "--upload", "Upload configuration, but don't apply it") do |v|
         options[:upload] = true
@@ -157,6 +165,11 @@ OPTIONS:
 	  parser.on("-x", "--xoptions OPTIONS", "Extra options for puppet apply like --noop") do |name|
         options[:xoptions] = name
         pocketknife_puppet.xoptions = name
+      end
+	  
+	  parser.on("-y", "--syntax PATH", "Syntax and style testing of puppet scripts in the module path specified") do |name|
+        options[:syntax] = true
+        pocketknife_puppet.syntax = name
       end
 	  
 	  parser.on("-z", "--noupdatepackages", "don't update the packages before running puppet") do |v|
@@ -183,17 +196,28 @@ OPTIONS:
       end
 
       begin
+  
+       if not options[:upload] and not options[:apply]
+          pocketknife_puppet.deploy(nodes)
+	   else
+	   
         if options[:upload]
           pocketknife_puppet.upload(nodes)
         end
 
+        if options[:syntax]
+          pocketknife_puppet.syntax_check(nodes)
+        end	
+
+		if options[:rspec]
+          pocketknife_puppet.rspec_test(nodes)
+        end	
+		
         if options[:apply]
           pocketknife_puppet.apply(nodes)
         end
-
-        if not options[:upload] and not options[:apply]
-          pocketknife_puppet.deploy(nodes)
-        end
+		
+       end
       rescue NodeError => e
         puts "! #{e.node}: #{e}"
         exit -1
@@ -249,6 +273,15 @@ OPTIONS:
   
   # puppet module path
   attr_accessor :module_path  
+  
+   # puppet syntax and style testing 
+  attr_accessor :syntax  
+  
+   # puppet rspec testing
+  attr_accessor :rspec  
+  
+   # puppet apply with noop option 
+  attr_accessor :noop  
   
   # Can chef and its dependencies be installed automatically if not found? true means perform installation without prompting, false means quit if chef isn't available, and nil means prompt the user for input.
   attr_accessor :can_install
@@ -338,20 +371,40 @@ OPTIONS:
   def upload(nodes)
     node_manager.assert_known(nodes)
 	module_list = nil 
-    module_list =  pocketknife_puppet.module_path.gsub(/:/,' ') if pocketknife_puppet.module_path != nil
+    module_list = self.module_path.gsub(/:/,' ') if self.module_path != nil
     Node.prepare_upload(module_list) do
       for node in nodes
         node_manager.find(node).upload
       end
     end
   end
+  
+  # Syntax check configurations to remote nodes.
+  #
+  # @param [Array<String>] nodes A list of node names.
+  def syntax_check(nodes)
+    node_manager.assert_known(nodes)
+    for node in nodes
+      node_manager.find(node).syntax_check
+    end
+  end  
+  
+  # Syntax check configurations to remote nodes.
+  #
+  # @param [Array<String>] nodes A list of node names.
+  def rspec_test(nodes)
+    node_manager.assert_known(nodes)
+    for node in nodes
+      node_manager.find(node).rspec_test
+    end
+  end  
+
 
   # Applies configurations to remote nodes.
   #
   # @param [Array<String>] nodes A list of node names.
   def apply(nodes)
     node_manager.assert_known(nodes)
-
     for node in nodes
       node_manager.find(node).apply
     end

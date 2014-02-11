@@ -21,7 +21,9 @@ class Pocketknife_puppet
 	@noupdatepackages = false
 	@hiera = ""
 	@xoptions = ""
-	#@modules_list = ""
+	@syntax = ""
+	@rspec = ""
+	@noop = ""
 	@modules_path = ""
 
     # Initialize a new node.
@@ -73,6 +75,15 @@ class Pocketknife_puppet
 	  else 
          @modules_list = VAR_POCKETKNIFE_MODULES.basename.to_s 	  
       end
+	  if pocketknife.noop != nil and pocketknife.noop == true	  
+         @noop ="--noop"
+      end
+	  if pocketknife.syntax != nil and pocketknife.syntax != ""
+   	     @syntax = VAR_POCKETKNIFE + pocketknife.syntax
+      end
+	  if pocketknife.rspec != nil and pocketknife.rspec != ""
+   	     @rspec = VAR_POCKETKNIFE + pocketknife.rspec
+      end	  
 	  self.connection_cache = nil
     end
 
@@ -209,8 +220,8 @@ class Pocketknife_puppet
       end
       unless self.has_executable?("librarian-puppet")
          self.install_puppet_librarian
-      end	  
-    end
+      end
+     end
 	
    # Installs Puppet on the remote node.
     def install_puppet
@@ -249,6 +260,24 @@ class Pocketknife_puppet
       self.say("Installed puppet librarian", false)
     end	
 	
+	# Installs rspec-puppet on the remote node.
+    def install_rspec_puppet
+      self.say("*** Installing rspec puppet ***")
+      self.execute <<-HERE
+      #{@sudo} gem install rake rspec rspec-puppet  
+    HERE
+      self.say("Installed rspec-puppet", false)
+    end
+	
+	# Installs puppet-lint on the remote node.
+    def install_puppet_lint
+      self.say("*** Installing puppet-lint ***")
+      self.execute <<-HERE
+      #{@sudo} gem install puppet-lint  
+    HERE
+       self.say("Installed puppet-lint", false)
+    end
+	
     def install_packages
       self.say("*** Installing packages ***")
       case self.platform[:distributor].downcase
@@ -261,7 +290,7 @@ class Pocketknife_puppet
          self.execute <<-HERE
     yum -y update
      HERE
-      end
+	  end
       self.say("Updated Packages", false)
     end  	
 
@@ -338,7 +367,7 @@ class Pocketknife_puppet
        self.execute <<-HERE
 	rm -f /var/log/puppet/apply.log &&   
     umask 0377 &&
-	export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock &&
+	export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock:/var/local/pocketknife/validate.sh &&
    rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} &&
    export GLOBIGNORE= &&
    mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}"  
@@ -367,7 +396,7 @@ class Pocketknife_puppet
       self.say("*** Removing old files ***", false)
       self.execute <<-HERE
    umask 0377 &&
-  export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock &&
+  export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock:/var/local/pocketknife/validate.sh &&
   #{@sudo}rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} && 
   export GLOBIGNORE= &&
   #{@sudo}mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}" &&
@@ -392,11 +421,77 @@ class Pocketknife_puppet
       self.say("*** Finished uploading! *** ", false)
       self.say("*************************** ", false)
     end
-    
- 
 
-    
-
+    # Syntax check the configuration module on the node.
+    def syntax_check
+         self.install 
+         unless self.has_executable?("puppet-lint")
+          self.install_puppet_lint
+         end
+         if !self.connection.file_exists?("#{VAR_POCKETKNIFE_VALIDATE}")
+		    puts "*** File #{VAR_POCKETKNIFE_VALIDATE} does not exist on remote host"
+            File.open(TMP_POCKETKNIFE_VALIDATE.to_s, 'wb') {|f|	
+             f.puts('#!/bin/sh') 
+             f.puts('echo "***Syntax Checking  ${PWD}"')			 
+             f.puts('for i in $(find . -regex ".*pp$"); do') 
+             f.puts('  echo "*** file $i";')
+             f.puts('  puppet parser validate $i;')
+             f.puts('  if [[ ! $? -eq 0 ]]; then')
+             f.puts('    echo"*** puppet syntax errors found!"')
+             f.puts('    break')
+             f.puts('  fi')
+             f.puts('  puppet-lint --no-80chars-check --fail-on-warnings $i')
+             f.puts('  if [[ ! $? -eq 0 ]]; then')
+             f.puts('    echo "*** puppet code style broken!"')
+             f.puts('    break')
+             f.puts('  fi')
+             f.puts('done')
+           }
+		   puts "*** Uploading file  #{TMP_POCKETKNIFE_VALIDATE} to #{VAR_POCKETKNIFE_VALIDATE}"
+           self.connection.file_upload(TMP_POCKETKNIFE_VALIDATE.to_s, VAR_POCKETKNIFE_VALIDATE.to_s)
+		   File.delete(TMP_POCKETKNIFE_VALIDATE.to_s)
+		   self.execute("chmod a+x #{VAR_POCKETKNIFE_VALIDATE}", true)
+		 else 
+           self.execute("chmod a+x #{VAR_POCKETKNIFE_VALIDATE}", true)		 
+         end			 
+         self.say("*************************************************** ", true)
+         self.say("*** Syntax Checking module #{@syntax} *** ", true)
+         self.say("*************************************************** ", true)
+	     self.say("***sudo is #{@sudo} ", true)	  	  
+         begin 
+	     self.execute(<<-HERE, true)
+  cd #{@syntax}	&&	 
+  #{@sudo} #{VAR_POCKETKNIFE_VALIDATE}  >  /var/log/puppet/syntax.log
+	 HERE
+         rescue
+         end 
+         self.say("*** showing last 40 lines from /var/log/puppet/syntax.log *** ")
+         self.execute("#{@sudo} tail -n 40 /var/log/puppet/syntax.log", true)		 
+		 self.say("*** Finished Syntax checking full log is at /var/log/puppet/syntax.log ***")
+     end
+  
+    # rspec test the configuration module on the node.
+    def rspec_test 
+	     self.install
+         unless self.has_executable?("rspec-puppet-init")
+          self.install_rspec_puppet
+         end    
+         self.say("******************************************************************* ", true)
+         self.say("*** RSpec testing module #{@rspec} *** ", true)
+         self.say("******************************************************************* ", true)
+	     self.say("***sudo is #{@sudo} ", true)	  	  
+         begin 
+	     self.execute(<<-HERE, true)
+  cd #{@rspec} &&		 
+  #{@sudo} rake spec > /var/log/puppet/rspec.log
+	 HERE
+         rescue
+         end 
+         self.say("*** showing last 40 lines from /var/log/puppet/rspec.log *** ")
+         self.execute("#{@sudo} tail -n 40 /var/log/puppet/rspec.log", true)		 
+		 self.say("*** Finished Rspec testing full log is at /var/log/puppet/rspec.log ***")
+     end  
+	  
     # Applies the configuration to the node. Installs Puppet, Ruby and Rubygems if needed.
     def apply
       self.install
@@ -411,7 +506,6 @@ class Pocketknife_puppet
       else 
         facts_cmd = "true"
       end  
-	  
 	  if self.connection.file_exists?("#{VAR_POCKETKNIFE}/Puppetfile.lock")
        self.say("******************************************************************* ", true)
        self.say("*** librarian-puppet not run as Puppetfile.lock already in repo *** ", true)
@@ -432,7 +526,6 @@ class Pocketknife_puppet
       else 
 	   self.say("*** No #{VAR_POCKETKNIFE}/Puppetfile in Puppet Repository *** ", true)
       end
-	  
       self.say("****************************** ", true)
       self.say("*** Applying configuration *** ", true)
       self.say("****************************** ", true)
@@ -441,11 +534,10 @@ class Pocketknife_puppet
 	  if pocketknife.module_path != nil and pocketknife.module_path != ""	  
          @modules_list = pocketknife.module_path.gsub(/:/,' ')
       end
-      command = "puppet apply #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=\"#{VAR_POCKETKNIFE_MODULES}#{@modules_path}\" #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
+      command = "puppet apply #{@noop} #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=\"#{VAR_POCKETKNIFE_MODULES}#{@modules_path}\" #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
       command << " -v -d " if self.pocketknife.verbosity == true
       error_run = false 
       begin 
- 
 	  self.execute(<<-HERE, true)
  #{@sudo_facts}#{facts_cmd} &&	  	  
  #{@sudo} #{facts_env} #{command}
@@ -466,6 +558,8 @@ class Pocketknife_puppet
     # Deploys the configuration to the node, which calls {#upload} and {#apply}.
     def deploy
       self.upload
+	  self.syntax_check if @syntax != nil and @syntax != ""
+	  self.rspec_test if @rspec != nil and @rspec != "" 
       self.apply
     end
 
@@ -505,6 +599,7 @@ class Pocketknife_puppet
     # Remote path to temporary tarball containing uploaded files.
     # @private
     VAR_POCKETKNIFE_TARBALL = VAR_POCKETKNIFE_CACHE + "pocketknife.tmp"
+	VAR_POCKETKNIFE_VALIDATE = VAR_POCKETKNIFE + "validate.sh"
     # Remote path to pocketknife's manifests
     # @private
     VAR_POCKETKNIFE_MANIFESTS = VAR_POCKETKNIFE + "manifests"
@@ -547,5 +642,6 @@ class Pocketknife_puppet
     # Local path to the tarball to upload to the remote node containing shared files
     # @private
     TMP_TARBALL = Pathname.new("pocketknife.tmp")
+	TMP_POCKETKNIFE_VALIDATE = Pathname.new("validate.sh")
   end
 end
