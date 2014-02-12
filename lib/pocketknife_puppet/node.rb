@@ -25,6 +25,7 @@ class Pocketknife_puppet
 	@rspec = ""
 	@noop = ""
 	@modules_path = ""
+	@log_location = "/var/log/puppet"
 
     # Initialize a new node.
     #
@@ -38,6 +39,7 @@ class Pocketknife_puppet
 		    case self.platform[:distributor].downcase
               when /ubuntu/, /debian/, /gnu\/linux/
 		        @sudo = "echo #{pocketknife.sudo_password} | sudo -S "
+				@log_location = "#{VAR_POCKETKNIFE}"
 			  else
 			    @sudo = "echo #{pocketknife.sudo_password} | sudo -S "
 				@sudo_facts = "echo #{pocketknife.sudo_password} | sudo -S "
@@ -368,7 +370,7 @@ class Pocketknife_puppet
        self.say("*** Removing old files *** ", false)
 		self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
        self.execute <<-HERE
-	rm -f /var/log/puppet/apply.log &&   
+	rm -f #{@log_location}/apply.log &&   
     umask 0377 &&
 	export GLOBIGNORE=#{VAR_POCKETKNIFE}/modules:#{VAR_POCKETKNIFE}/Puppetfile:#{VAR_POCKETKNIFE}/Puppetfile.lock:#{VAR_POCKETKNIFE}/validate.sh &&
    rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} &&
@@ -399,7 +401,7 @@ class Pocketknife_puppet
       self.say("*** Removing old files ***", false)
 	  self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
       self.execute <<-HERE
-	  rm -f /var/log/puppet/apply.log &&
+  #{@sudo}rm -f #{@log_location}/apply.log &&
    umask 0377 &&
   export GLOBIGNORE=#{VAR_POCKETKNIFE}/modules:#{VAR_POCKETKNIFE}/Puppetfile:#{VAR_POCKETKNIFE}/Puppetfile.lock:#{VAR_POCKETKNIFE}/validate.sh &&
   #{@sudo}rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} && 
@@ -436,7 +438,7 @@ class Pocketknife_puppet
          if !self.connection.file_exists?("#{VAR_POCKETKNIFE_VALIDATE}")
 		    puts "*** File #{VAR_POCKETKNIFE_VALIDATE} does not exist on remote host"
             File.open(TMP_POCKETKNIFE_VALIDATE.to_s, 'wb') {|f|	
-             f.puts('#!/bin/sh') 
+             f.puts('#!/bin/bash') 
              f.puts('echo "***Syntax Checking  ${PWD}"')			 
              f.puts('for i in $(find . -regex ".*pp$"); do') 
              f.puts('  echo "*** file $i";')
@@ -466,13 +468,13 @@ class Pocketknife_puppet
          begin 
 	     self.execute(<<-HERE, true)
   cd #{@syntax}	&&	 
-  #{@sudo} #{VAR_POCKETKNIFE_VALIDATE}  >  /var/log/puppet/syntax.log
+  #{@sudo} #{VAR_POCKETKNIFE_VALIDATE}  > #{@log_location}/syntax.log
 	 HERE
          rescue
          end 
-         self.say("*** showing last 40 lines from /var/log/puppet/syntax.log *** ")
-         self.execute("#{@sudo} tail -n 40 /var/log/puppet/syntax.log", true)		 
-		 self.say("*** Finished Syntax checking full log is at /var/log/puppet/syntax.log ***")
+         self.say("*** showing last 40 lines from #{@log_location}/syntax.log *** ")
+         self.execute("#{@sudo} tail -n 40 #{@log_location}/syntax.log", true)		 
+		 self.say("*** Finished Syntax checking full log is at #{@log_location}/syntax.log ***")
      end
   
     # rspec test the configuration module on the node.
@@ -488,13 +490,13 @@ class Pocketknife_puppet
          begin 
 	     self.execute(<<-HERE, true)
   cd #{@rspec} &&		 
-  #{@sudo} rake spec > /var/log/puppet/rspec.log
+  #{@sudo} rake spec > #{@log_location}/rspec.log
 	 HERE
          rescue
          end 
-         self.say("*** showing last 40 lines from /var/log/puppet/rspec.log *** ")
-         self.execute("#{@sudo} tail -n 40 /var/log/puppet/rspec.log", true)		 
-		 self.say("*** Finished Rspec testing full log is at /var/log/puppet/rspec.log ***")
+         self.say("*** showing last 40 lines from #{@log_location}/rspec.log *** ")
+         self.execute("#{@sudo} tail -n 40 #{@log_location}/rspec.log", true)		 
+		 self.say("*** Finished Rspec testing full log is at #{@log_location}/rspec.log ***")
      end  
 	  
     # Applies the configuration to the node. Installs Puppet, Ruby and Rubygems if needed.
@@ -539,7 +541,7 @@ class Pocketknife_puppet
 	  if pocketknife.module_path != nil and pocketknife.module_path != ""	  
          @modules_list = pocketknife.module_path.gsub(/:/,' ')
       end
-      command = "puppet apply #{@noop} #{@xoptions} #{@hiera}  --logdest /var/log/puppet/apply.log --modulepath=\"#{VAR_POCKETKNIFE_MODULES}#{@modules_path}\" #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
+      command = "puppet apply #{@noop} #{@xoptions} #{@hiera}  --logdest #{@log_location}/apply.log --modulepath=\"#{VAR_POCKETKNIFE_MODULES}#{@modules_path}\" #{VAR_POCKETKNIFE_MANIFESTS}/#{self.pocketknife.manifest}"
       command << " -v -d " if self.pocketknife.verbosity == true
       error_run = false 
       begin 
@@ -551,12 +553,12 @@ class Pocketknife_puppet
          error_run = true 
       end 
 	     self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
-         self.say("*** showing last 100 lines from /var/log/puppet/apply.log *** ")
-         self.execute("#{@sudo} tail -n 100 /var/log/puppet/apply.log", true)
+         self.say("*** showing last 100 lines from #{@log_location}/apply.log *** ")
+         self.execute("#{@sudo} tail -n 100 #{@log_location}/apply.log", true)
          if error_run 
-            self.say("*** Finished applying with Error! full log is at /var/log/puppet/apply.log *** ")
+            self.say("*** Finished applying with Error! full log is at #{@log_location}/apply.log *** ")
 	 else
-	  self.say("*** Finished applying! full log is at /var/log/puppet/apply.log *** ")
+	  self.say("*** Finished applying! full log is at #{@log_location}/apply.log *** ")
 	 end 
     end
 
