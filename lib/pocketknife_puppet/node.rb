@@ -215,6 +215,9 @@ class Pocketknife_puppet
     # @raise [NotInstalling] Raised if Puppet isn't installed, but user didn't allow installation.
     # @raise [UnsupportedInstallationPlatform] Raised if there's no installation information for this platform.
     def install
+	  if @noupdatepackages == nil or @noupdatepackages != true
+	    self.install_packages
+	  end	
       unless self.has_executable?("puppet")
          self.install_puppet
       end
@@ -226,9 +229,6 @@ class Pocketknife_puppet
    # Installs Puppet on the remote node.
     def install_puppet
       self.say("*** Installing puppet ***")
-	  if @noupdatepackages == nil or @noupdatepackages != true
-	    self.install_packages
-	  end	
       case self.platform[:distributor].downcase
         when /ubuntu/, /debian/, /gnu\/linux/
         self.execute <<-HERE
@@ -361,13 +361,16 @@ class Pocketknife_puppet
    def upload
      if @sudo != nil and @sudo != ""
        upload_sudo
-     else   
-       self.say("*** Uploading configuration ***")
-        self.say("*** Removing old files *** ", false)
+     else 
+       self.say("******************************* ")
+       self.say("*** Uploading configuration *** ")
+       self.say("******************************* ")	 
+       self.say("*** Removing old files *** ", false)
+		self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
        self.execute <<-HERE
 	rm -f /var/log/puppet/apply.log &&   
     umask 0377 &&
-	export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock:/var/local/pocketknife/validate.sh &&
+	export GLOBIGNORE=#{VAR_POCKETKNIFE}/modules:#{VAR_POCKETKNIFE}/Puppetfile:#{VAR_POCKETKNIFE}/Puppetfile.lock:#{VAR_POCKETKNIFE}/validate.sh &&
    rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} &&
    export GLOBIGNORE= &&
    mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}"  
@@ -394,9 +397,11 @@ class Pocketknife_puppet
       self.say("*** Uploading configuration using sudo *** ")
       self.say("****************************************** ")
       self.say("*** Removing old files ***", false)
+	  self.execute("#{@sudo}rm -rf \"#{VAR_POCKETKNIFE}\" \"#{VAR_POCKETKNIFE_CACHE}\"") if @deleterepo == true
       self.execute <<-HERE
+	  rm -f /var/log/puppet/apply.log &&
    umask 0377 &&
-  export GLOBIGNORE=/var/local/pocketknife/modules:/var/local/pocketknife/Puppetfile:/var/local/pocketknife/Puppetfile.lock:/var/local/pocketknife/validate.sh &&
+  export GLOBIGNORE=#{VAR_POCKETKNIFE}/modules:#{VAR_POCKETKNIFE}/Puppetfile:#{VAR_POCKETKNIFE}/Puppetfile.lock:#{VAR_POCKETKNIFE}/validate.sh &&
   #{@sudo}rm -rf #{ETC_PUPPET} #{VAR_POCKETKNIFE}/* #{VAR_POCKETKNIFE_CACHE} && 
   export GLOBIGNORE= &&
   #{@sudo}mkdir -p "#{ETC_PUPPET}" "#{VAR_POCKETKNIFE}" "#{VAR_POCKETKNIFE}/modules" "#{VAR_POCKETKNIFE_CACHE}" &&
