@@ -43,6 +43,7 @@ class Pocketknife_puppet
 			  else
 			    @sudo = "echo #{pocketknife.sudo_password} | sudo -S "
 				@sudo_facts = "echo #{pocketknife.sudo_password} | sudo -S "
+				@log_location = "#{VAR_POCKETKNIFE}"
 			end  
 		 else
            @sudo = "sudo "
